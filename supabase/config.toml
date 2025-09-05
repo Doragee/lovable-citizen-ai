@@ -1,1 +1,16 @@
 project_id = "xjnrfwfyxcbbusysdhmz"
+
+[functions.search-similar-complaints]
+verify_jwt = false
+
+[functions.submit-complaint]
+verify_jwt = false
+
+[functions.analyze-malicious-complainants]
+verify_jwt = false
+
+[functions.generate-ai-response]
+verify_jwt = false
+
+[functions.chatbot-query]
+verify_jwt = false
