@@ -183,29 +183,76 @@ ${departments?.map(dept => `
     }
 
     // Insert into civilcomplaint table
-    const { data: insertData, error: insertError } = await supabase
-      .from('civilcomplaint')
-      .insert({
-        // id: 데이터베이스가 자동으로 생성
-        civilianid: 1295,
-        complaint_number: String(nextComplaintNumber),
-        title: title,
-        request_content: content,
-        category: category,
-        summary: aiAnalysis.summary,
-        department: aiAnalysis.department,
-        status: '0',
-        request_date: new Date().toISOString().split('T')[0],
-        title_embedding: titleEmbedding ? JSON.stringify(titleEmbedding) : null,
-        request_content_embedding: contentEmbedding ? JSON.stringify(contentEmbedding) : null,
-        summary_embedding: summaryEmbedding ? JSON.stringify(summaryEmbedding) : null
-      })
-      .select()
-      .single();
+    let insertData;
+    let insertError;
+    try {
+      const initial = await supabase
+        .from('civilcomplaint')
+        .insert({
+          // id: 데이터베이스가 자동으로 생성
+          civilianid: 1295,
+          complaint_number: String(nextComplaintNumber),
+          title: title,
+          request_content: content,
+          category: category,
+          summary: aiAnalysis.summary,
+          department: aiAnalysis.department,
+          status: '0',
+          request_date: new Date().toISOString().split('T')[0],
+          title_embedding: titleEmbedding ? JSON.stringify(titleEmbedding) : null,
+          request_content_embedding: contentEmbedding ? JSON.stringify(contentEmbedding) : null,
+          summary_embedding: summaryEmbedding ? JSON.stringify(summaryEmbedding) : null
+        })
+        .select()
+        .single();
+      insertData = initial.data;
+      insertError = initial.error as any;
+    } catch (e) {
+      insertError = e as any;
+    }
 
     if (insertError) {
       console.error('Insert error:', insertError);
-      throw insertError;
+      if ((insertError as any).code === '23505' || String((insertError as any).message || '').includes('duplicate key')) {
+        console.warn('Duplicate key on id detected. Retrying with MAX(id)+1...');
+        const { data: maxRow, error: maxErr } = await supabase
+          .from('civilcomplaint')
+          .select('id')
+          .order('id', { ascending: false })
+          .limit(1)
+          .single();
+        if (maxErr) {
+          console.error('Failed to fetch MAX(id) for retry:', maxErr);
+          throw insertError;
+        }
+        const newId = (maxRow?.id ?? 0) + 1;
+        const retry = await supabase
+          .from('civilcomplaint')
+          .insert({
+            id: newId,
+            civilianid: 1295,
+            complaint_number: String(nextComplaintNumber),
+            title: title,
+            request_content: content,
+            category: category,
+            summary: aiAnalysis.summary,
+            department: aiAnalysis.department,
+            status: '0',
+            request_date: new Date().toISOString().split('T')[0],
+            title_embedding: titleEmbedding ? JSON.stringify(titleEmbedding) : null,
+            request_content_embedding: contentEmbedding ? JSON.stringify(contentEmbedding) : null,
+            summary_embedding: summaryEmbedding ? JSON.stringify(summaryEmbedding) : null
+          })
+          .select()
+          .single();
+        if (retry.error) {
+          console.error('Retry insert failed:', retry.error);
+          throw retry.error;
+        }
+        insertData = retry.data;
+      } else {
+        throw insertError;
+      }
     }
 
     console.log('Complaint submitted successfully:', insertData.id);
