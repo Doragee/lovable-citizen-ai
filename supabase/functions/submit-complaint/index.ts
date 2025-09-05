@@ -163,18 +163,30 @@ ${departments?.map(dept => `
       }
     }
 
-    // Generate next ID and complaint number
-    const lastId = lastComplaint?.id ? Number(lastComplaint.id) : 0;
-    const nextId = lastId + 1;
-    const lastNumRaw = (lastComplaint?.complaint_number ?? 0) as number | string;
-    const lastNumParsed = typeof lastNumRaw === 'number' ? lastNumRaw : Number(lastNumRaw) || 0;
-    const nextComplaintNumber = lastNumParsed + 1;
+    // Generate next complaint_number based on last row, preserving format if it contains digits
+    const lastCn = lastComplaint?.complaint_number ?? null;
+    let nextComplaintNumber: string;
+    if (lastCn) {
+      const lastStr = String(lastCn);
+      const re = /(\d+)(?!.*\d)/;
+      const m = lastStr.match(re);
+      if (m) {
+        const width = m[1].length;
+        const inc = (parseInt(m[1], 10) + 1).toString().padStart(width, '0');
+        nextComplaintNumber = lastStr.replace(re, inc);
+      } else {
+        const asNum = Number(lastStr);
+        nextComplaintNumber = Number.isFinite(asNum) ? String(asNum + 1) : '1';
+      }
+    } else {
+      nextComplaintNumber = '1';
+    }
 
     // Insert into civilcomplaint table
     const { data: insertData, error: insertError } = await supabase
       .from('civilcomplaint')
       .insert({
-        id: nextId,
+        // id: auto-generated
         civilianid: 1295,
         complaint_number: String(nextComplaintNumber),
         title: title,
@@ -184,9 +196,9 @@ ${departments?.map(dept => `
         department: aiAnalysis.department,
         status: '0',
         request_date: new Date().toISOString().split('T')[0],
-        title_embedding: titleEmbedding,
-        request_content_embedding: contentEmbedding,
-        summary_embedding: summaryEmbedding
+        title_embedding: titleEmbedding ? JSON.stringify(titleEmbedding) : null,
+        request_content_embedding: contentEmbedding ? JSON.stringify(contentEmbedding) : null,
+        summary_embedding: summaryEmbedding ? JSON.stringify(summaryEmbedding) : null
       })
       .select()
       .single();
