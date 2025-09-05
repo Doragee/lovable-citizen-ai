@@ -30,10 +30,17 @@ serve(async (req) => {
 
     console.log('Processing complaint submission:', { title, category });
 
-    // Get the last complaint to determine next ID and complaint number
-    const { data: lastComplaint } = await supabase
+    // Get the last complaint numbers from both tables to determine next complaint_number
+    const { data: lastNew, error: lastNewError } = await supabase
       .from('new_civilcomplaint')
-      .select('id, complaint_number')
+      .select('complaint_number')
+      .order('id', { ascending: false })
+      .limit(1)
+      .single();
+
+    const { data: lastOld, error: lastOldError } = await supabase
+      .from('civilcomplaint')
+      .select('complaint_number')
       .order('id', { ascending: false })
       .limit(1)
       .single();
@@ -187,20 +194,30 @@ ${departments?.map(dept => `
       }
     }
 
-    // Generate next complaint_number based on last row, preserving format if it contains digits
-    const lastCn = lastComplaint?.complaint_number ?? null;
+    // Generate next complaint_number safely across both tables, preserving numeric suffix width
+    const candidates = [lastNew?.complaint_number, lastOld?.complaint_number].filter(Boolean) as string[];
+
+    function extractTailNum(s: string): { num: number; width: number; str: string } | null {
+      const m = String(s).match(/(\d+)(?!.*\d)/);
+      return m ? { num: parseInt(m[1], 10), width: m[1].length, str: String(s) } : null;
+    }
+
     let nextComplaintNumber: string;
-    if (lastCn) {
-      const lastStr = String(lastCn);
-      const re = /(\d+)(?!.*\d)/;
-      const m = lastStr.match(re);
-      if (m) {
-        const width = m[1].length;
-        const inc = (parseInt(m[1], 10) + 1).toString().padStart(width, '0');
-        nextComplaintNumber = lastStr.replace(re, inc);
+    if (candidates.length > 0) {
+      // Pick candidate with the largest numeric tail
+      const parsed = candidates
+        .map(extractTailNum)
+        .filter(Boolean) as Array<{ num: number; width: number; str: string }>;
+      if (parsed.length > 0) {
+        const best = parsed.reduce((a, b) => (b.num > a.num ? b : a));
+        const re = /(\d+)(?!.*\d)/;
+        const inc = String(best.num + 1).padStart(best.width, '0');
+        nextComplaintNumber = best.str.replace(re, inc);
       } else {
-        const asNum = Number(lastStr);
-        nextComplaintNumber = Number.isFinite(asNum) ? String(asNum + 1) : '1';
+        // No numeric tail found; fallback to simple increment if numeric, else timestamp-based unique suffix
+        const base = String(candidates[0]);
+        const asNum = Number(base);
+        nextComplaintNumber = Number.isFinite(asNum) ? String(asNum + 1) : `${base}-${Date.now()}`;
       }
     } else {
       nextComplaintNumber = '1';

@@ -439,7 +439,13 @@ const ComplaintProcessing = () => {
                     variant="default" 
                     size="sm" 
                     className="w-full"
-                    onClick={() => setResponseContent(aiRecommendation || "")}
+                    onClick={() => {
+                      setResponseContent(aiRecommendation || "");
+                      toast({
+                        title: "적용 완료",
+                        description: "AI 추천 답변을 입력란에 적용했습니다.",
+                      });
+                    }}
                     disabled={currentComplaint.status === '1' || !aiRecommendation}
                   >
                     답변 적용
@@ -515,6 +521,10 @@ const ComplaintProcessing = () => {
                 onClick={() => {
                   setResponseContent(aiRecommendation || "");
                   setShowAIRecommendation(false);
+                  toast({
+                    title: "적용 완료",
+                    description: "AI 추천 답변을 입력란에 적용했습니다.",
+                  });
                 }}
                 disabled={!aiRecommendation || currentComplaint.status === '1'}
               >
