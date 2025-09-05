@@ -21,10 +21,9 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const openaiApiKey = Deno.env.get('chatgpt');
-
+    const openaiApiKey = Deno.env.get('chatgpt') || Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
-      throw new Error('OpenAI API key not found');
+      console.warn('OpenAI API key not found. Proceeding with fallback analysis and no embeddings.');
     }
 
     const supabase = createClient(supabaseUrl!, supabaseKey!);
@@ -44,19 +43,22 @@ serve(async (req) => {
       .from('departments')
       .select('department_name, maintask1, Maintask2, Maintask3, Maintask4, Maintask5, Keyword1, Keyword2, Keyword3');
 
-    // Generate summary and department assignment using ChatGPT
-    const summaryResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `당신은 한국 정부 민원 분석 전문가입니다. 
+    // Generate summary and department assignment (fallback if AI unavailable)
+    let aiAnalysis;
+    if (openaiApiKey) {
+      try {
+        const summaryResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'system',
+                content: `당신은 한국 정부 민원 분석 전문가입니다. 
 민원 내용을 분석하여 1줄 요약과 가장 적합한 부서를 찾아주세요.
 
 부서 정보:
@@ -68,85 +70,98 @@ ${departments?.map(dept => `
 
 응답은 반드시 다음 JSON 형식으로만 답변하세요:
 {"summary": "요약 내용", "department": "부서명"}`
-          },
-          {
-            role: 'user',
-            content: `제목: ${title}\n내용: ${content}\n카테고리: ${category}`
+              },
+              {
+                role: 'user',
+                content: `제목: ${title}
+내용: ${content}
+카테고리: ${category}`
+              }
+            ],
+            max_tokens: 300
+          }),
+        });
+        if (summaryResponse.ok) {
+          const summaryData = await summaryResponse.json();
+          try {
+            aiAnalysis = JSON.parse(summaryData.choices[0].message.content);
+          } catch (parseError) {
+            console.error('AI response parsing error:', parseError);
           }
-        ],
-        max_tokens: 300
-      }),
-    });
-
-    if (!summaryResponse.ok) {
-      throw new Error('Failed to generate summary');
+        } else {
+          console.warn('AI summary generation failed with status', summaryResponse.status);
+        }
+      } catch (err) {
+        console.error('AI summary generation error:', err);
+      }
     }
-
-    const summaryData = await summaryResponse.json();
-    let aiAnalysis;
-    
-    try {
-      aiAnalysis = JSON.parse(summaryData.choices[0].message.content);
-    } catch (parseError) {
-      console.error('AI response parsing error:', parseError);
+    if (!aiAnalysis) {
       aiAnalysis = {
         summary: content.substring(0, 100) + '...',
         department: '일반행정과'
       };
     }
+    console.log('AI Analysis completed (with fallback if needed):', aiAnalysis);
 
-    console.log('AI Analysis completed:', aiAnalysis);
+    // Generate embeddings for title, content, and summary (optional)
+    let titleEmbedding = null;
+    let contentEmbedding = null;
+    let summaryEmbedding = null;
+    if (openaiApiKey) {
+      try {
+        const [titleEmbeddingResponse, contentEmbeddingResponse, summaryEmbeddingResponse] = await Promise.all([
+          fetch('https://api.openai.com/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openaiApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'text-embedding-3-small',
+              input: title,
+            }),
+          }),
+          fetch('https://api.openai.com/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openaiApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'text-embedding-3-small',
+              input: content,
+            }),
+          }),
+          fetch('https://api.openai.com/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openaiApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'text-embedding-3-small',
+              input: aiAnalysis.summary,
+            }),
+          })
+        ]);
 
-    // Generate embeddings for title, content, and summary
-    const [titleEmbeddingResponse, contentEmbeddingResponse, summaryEmbeddingResponse] = await Promise.all([
-      fetch('https://api.openai.com/v1/embeddings', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'text-embedding-3-small',
-          input: title,
-        }),
-      }),
-      fetch('https://api.openai.com/v1/embeddings', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'text-embedding-3-small',
-          input: content,
-        }),
-      }),
-      fetch('https://api.openai.com/v1/embeddings', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'text-embedding-3-small',
-          input: aiAnalysis.summary,
-        }),
-      })
-    ]);
+        if (titleEmbeddingResponse.ok && contentEmbeddingResponse.ok && summaryEmbeddingResponse.ok) {
+          const [titleEmbeddingData, contentEmbeddingData, summaryEmbeddingData] = await Promise.all([
+            titleEmbeddingResponse.json(),
+            contentEmbeddingResponse.json(),
+            summaryEmbeddingResponse.json()
+          ]);
 
-    if (!titleEmbeddingResponse.ok || !contentEmbeddingResponse.ok || !summaryEmbeddingResponse.ok) {
-      throw new Error('Failed to generate embeddings');
+          titleEmbedding = titleEmbeddingData.data[0].embedding;
+          contentEmbedding = contentEmbeddingData.data[0].embedding;
+          summaryEmbedding = summaryEmbeddingData.data[0].embedding;
+        } else {
+          console.warn('Embedding generation failed, proceeding without embeddings');
+        }
+      } catch (err) {
+        console.error('Embedding generation error:', err);
+      }
     }
-
-    const [titleEmbeddingData, contentEmbeddingData, summaryEmbeddingData] = await Promise.all([
-      titleEmbeddingResponse.json(),
-      contentEmbeddingResponse.json(),
-      summaryEmbeddingResponse.json()
-    ]);
-
-    const titleEmbedding = titleEmbeddingData.data[0].embedding;
-    const contentEmbedding = contentEmbeddingData.data[0].embedding;
-    const summaryEmbedding = summaryEmbeddingData.data[0].embedding;
 
     // Generate next ID and complaint number
     const lastId = lastComplaint?.id ? Number(lastComplaint.id) : 0;
@@ -161,7 +176,7 @@ ${departments?.map(dept => `
       .insert({
         id: nextId,
         civilianid: 1295,
-        complaint_number: nextComplaintNumber,
+        complaint_number: String(nextComplaintNumber),
         title: title,
         request_content: content,
         category: category,
