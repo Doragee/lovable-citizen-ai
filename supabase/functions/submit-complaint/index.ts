@@ -32,7 +32,7 @@ serve(async (req) => {
 
     // Get the last complaint to determine next ID and complaint number
     const { data: lastComplaint } = await supabase
-      .from('civilcomplaint')
+      .from('new_civilcomplaint')
       .select('id, complaint_number')
       .order('id', { ascending: false })
       .limit(1)
@@ -182,9 +182,9 @@ ${departments?.map(dept => `
       nextComplaintNumber = '1';
     }
 
-    // Insert into civilcomplaint table
+    // Insert into new_civilcomplaint table
     const { data: insertData, error: insertError } = await supabase
-      .from('civilcomplaint')
+      .from('new_civilcomplaint')
       .insert({
         // id: 데이터베이스가 자동으로 생성
         civilianid: 1295,

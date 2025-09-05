@@ -30,7 +30,7 @@ const ComplaintProcessing = () => {
   const loadLatestComplaint = async () => {
     try {
       const { data, error } = await supabase
-        .from('civilcomplaint')
+        .from('new_civilcomplaint' as any)
         .select('*')
         .eq('status', '0')
         .order('created_at', { ascending: false })
@@ -133,7 +133,7 @@ const ComplaintProcessing = () => {
     setIsSubmittingResponse(true);
     try {
       const { error } = await supabase
-        .from('civilcomplaint')
+        .from('new_civilcomplaint' as any)
         .update({
           response_content: responseContent,
           status: '1'

@@ -23,7 +23,7 @@ serve(async (req) => {
 
     // Get all complaints with embeddings
     const { data: complaints, error: complaintsError } = await supabase
-      .from('civilcomplaint')
+      .from('new_civilcomplaint')
       .select('civilianid, title, request_content, request_content_embedding, created_at')
       .not('request_content_embedding', 'is', null)
       .order('created_at', { ascending: false });
