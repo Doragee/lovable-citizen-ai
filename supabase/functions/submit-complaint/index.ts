@@ -31,40 +31,18 @@ serve(async (req) => {
 
     console.log('Processing complaint submission:', { title, category });
 
-    // Generate embeddings for title and content
-    const titleEmbeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-3-small',
-        input: title,
-      }),
-    });
+    // Get the last complaint to determine next ID and complaint number
+    const { data: lastComplaint } = await supabase
+      .from('civilcomplaint')
+      .select('id, complaint_number')
+      .order('id', { ascending: false })
+      .limit(1)
+      .single();
 
-    const contentEmbeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-3-small',
-        input: content,
-      }),
-    });
-
-    if (!titleEmbeddingResponse.ok || !contentEmbeddingResponse.ok) {
-      throw new Error('Failed to generate embeddings');
-    }
-
-    const titleEmbeddingData = await titleEmbeddingResponse.json();
-    const contentEmbeddingData = await contentEmbeddingResponse.json();
-
-    const titleEmbedding = titleEmbeddingData.data[0].embedding;
-    const contentEmbedding = contentEmbeddingData.data[0].embedding;
+    // Get departments data for AI analysis
+    const { data: departments } = await supabase
+      .from('departments')
+      .select('department_name, maintask1, Maintask2, Maintask3, Maintask4, Maintask5, Keyword1, Keyword2, Keyword3');
 
     // Generate summary and department assignment using ChatGPT
     const summaryResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -79,7 +57,15 @@ serve(async (req) => {
           {
             role: 'system',
             content: `당신은 한국 정부 민원 분석 전문가입니다. 
-민원 내용을 분석하여 1줄 요약과 적합한 부서를 추천해주세요.
+민원 내용을 분석하여 1줄 요약과 가장 적합한 부서를 찾아주세요.
+
+부서 정보:
+${departments?.map(dept => `
+부서명: ${dept.department_name}
+주요업무: ${[dept.maintask1, dept.Maintask2, dept.Maintask3, dept.Maintask4, dept.Maintask5].filter(Boolean).join(', ')}
+키워드: ${[dept.Keyword1, dept.Keyword2, dept.Keyword3].filter(Boolean).join(', ')}
+`).join('\n')}
+
 응답은 반드시 다음 JSON 형식으로만 답변하세요:
 {"summary": "요약 내용", "department": "부서명"}`
           },
@@ -88,7 +74,7 @@ serve(async (req) => {
             content: `제목: ${title}\n내용: ${content}\n카테고리: ${category}`
           }
         ],
-        max_tokens: 200
+        max_tokens: 300
       }),
     });
 
@@ -111,15 +97,70 @@ serve(async (req) => {
 
     console.log('AI Analysis completed:', aiAnalysis);
 
-    // Generate complaint number
-    const complaintNumber = `2024-SJ-${Date.now().toString().slice(-4)}`;
+    // Generate embeddings for title, content, and summary
+    const [titleEmbeddingResponse, contentEmbeddingResponse, summaryEmbeddingResponse] = await Promise.all([
+      fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-3-small',
+          input: title,
+        }),
+      }),
+      fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-3-small',
+          input: content,
+        }),
+      }),
+      fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-3-small',
+          input: aiAnalysis.summary,
+        }),
+      })
+    ]);
+
+    if (!titleEmbeddingResponse.ok || !contentEmbeddingResponse.ok || !summaryEmbeddingResponse.ok) {
+      throw new Error('Failed to generate embeddings');
+    }
+
+    const [titleEmbeddingData, contentEmbeddingData, summaryEmbeddingData] = await Promise.all([
+      titleEmbeddingResponse.json(),
+      contentEmbeddingResponse.json(),
+      summaryEmbeddingResponse.json()
+    ]);
+
+    const titleEmbedding = titleEmbeddingData.data[0].embedding;
+    const contentEmbedding = contentEmbeddingData.data[0].embedding;
+    const summaryEmbedding = summaryEmbeddingData.data[0].embedding;
+
+    // Generate next ID and complaint number
+    const nextId = lastComplaint ? lastComplaint.id + 1 : 1;
+    const lastComplaintNum = lastComplaint?.complaint_number || '2024-SJ-0000';
+    const lastNum = parseInt(lastComplaintNum.split('-')[2]) || 0;
+    const nextComplaintNumber = `2024-SJ-${String(lastNum + 1).padStart(4, '0')}`;
 
     // Insert into civilcomplaint table
     const { data: insertData, error: insertError } = await supabase
       .from('civilcomplaint')
       .insert({
+        id: nextId,
         civilianid: 1295,
-        complaint_number: complaintNumber,
+        complaint_number: nextComplaintNumber,
         title: title,
         request_content: content,
         category: category,
@@ -128,7 +169,8 @@ serve(async (req) => {
         status: '0',
         request_date: new Date().toISOString().split('T')[0],
         title_embedding: titleEmbedding,
-        request_content_embedding: contentEmbedding
+        request_content_embedding: contentEmbedding,
+        summary_embedding: summaryEmbedding
       })
       .select()
       .single();
