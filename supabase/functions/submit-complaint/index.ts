@@ -35,7 +35,7 @@ serve(async (req) => {
     const { data: lastComplaint } = await supabase
       .from('civilcomplaint')
       .select('id, complaint_number')
-      .order('id', { ascending: false })
+      .order('complaint_number', { ascending: false })
       .limit(1)
       .single();
 

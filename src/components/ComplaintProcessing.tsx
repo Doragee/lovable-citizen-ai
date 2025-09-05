@@ -158,7 +158,7 @@ const ComplaintProcessing = () => {
                   <Input value={`김***`} disabled className="bg-muted" />
                 </div>
                 <div>
-                  <Label>담당자</Label>
+                  <Label>담당부서</Label>
                   <Input value={currentComplaint.department || "미배정"} disabled className="bg-muted" />
                 </div>
               </div>
@@ -281,7 +281,12 @@ const ComplaintProcessing = () => {
                   <Button variant="outline" size="sm" className="w-full">
                     상세 보기
                   </Button>
-                  <Button variant="default" size="sm" className="w-full bg-info hover:bg-info/90">
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    className="w-full bg-info hover:bg-info/90"
+                    onClick={() => window.open('https://law.go.kr/LSW/aai/main.do', '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes')}
+                  >
                     AI 챗봇 문의
                   </Button>
                 </div>
