@@ -43,6 +43,10 @@ serve(async (req) => {
       .from('departments')
       .select('department_name, maintask1, Maintask2, Maintask3, Maintask4, Maintask5, Keyword1, Keyword2, Keyword3');
 
+    // Get valid department names for validation
+    const validDepartments = departments?.map(dept => dept.department_name) || [];
+    const defaultDepartment = validDepartments.length > 0 ? validDepartments[0] : 'Unknown';
+
     // Generate summary and department assignment (fallback if AI unavailable)
     let aiAnalysis;
     if (openaiApiKey) {
@@ -61,7 +65,12 @@ serve(async (req) => {
                 content: `당신은 한국 정부 민원 분석 전문가입니다. 
 민원 내용을 분석하여 1줄 요약과 가장 적합한 부서를 찾아주세요.
 
-부서 정보:
+중요: 부서명은 반드시 아래 제공된 부서 목록에서만 정확히 선택해야 합니다.
+
+사용 가능한 부서 목록:
+${validDepartments.map(name => `- ${name}`).join('\n')}
+
+부서별 상세 정보:
 ${departments?.map(dept => `
 부서명: ${dept.department_name}
 주요업무: ${[dept.maintask1, dept.Maintask2, dept.Maintask3, dept.Maintask4, dept.Maintask5].filter(Boolean).join(', ')}
@@ -69,7 +78,8 @@ ${departments?.map(dept => `
 `).join('\n')}
 
 응답은 반드시 다음 JSON 형식으로만 답변하세요:
-{"summary": "요약 내용", "department": "부서명"}`
+{"summary": "요약 내용", "department": "부서명"}
+부서명은 위 목록에서 정확히 일치하는 것만 사용하세요.`
               },
               {
                 role: 'user',
@@ -84,7 +94,17 @@ ${departments?.map(dept => `
         if (summaryResponse.ok) {
           const summaryData = await summaryResponse.json();
           try {
-            aiAnalysis = JSON.parse(summaryData.choices[0].message.content);
+            const parsedAnalysis = JSON.parse(summaryData.choices[0].message.content);
+            // Validate that the returned department exists in our department list
+            if (validDepartments.includes(parsedAnalysis.department)) {
+              aiAnalysis = parsedAnalysis;
+            } else {
+              console.warn(`AI returned invalid department: ${parsedAnalysis.department}. Using default.`);
+              aiAnalysis = {
+                summary: parsedAnalysis.summary || content.substring(0, 100) + '...',
+                department: defaultDepartment
+              };
+            }
           } catch (parseError) {
             console.error('AI response parsing error:', parseError);
           }
@@ -98,7 +118,7 @@ ${departments?.map(dept => `
     if (!aiAnalysis) {
       aiAnalysis = {
         summary: content.substring(0, 100) + '...',
-        department: '일반행정과'
+        department: defaultDepartment
       };
     }
     console.log('AI Analysis completed (with fallback if needed):', aiAnalysis);
