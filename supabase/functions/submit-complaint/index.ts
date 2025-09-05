@@ -182,11 +182,15 @@ ${departments?.map(dept => `
       nextComplaintNumber = '1';
     }
 
+    // Generate next unique id to avoid PK conflicts
+    const lastId = lastComplaint?.id ? Number(lastComplaint.id) : 0;
+    const nextId = lastId + 1;
+
     // Insert into civilcomplaint table
     const { data: insertData, error: insertError } = await supabase
       .from('civilcomplaint')
       .insert({
-        // id: auto-generated
+        id: nextId,
         civilianid: 1295,
         complaint_number: String(nextComplaintNumber),
         title: title,
