@@ -70,7 +70,8 @@ const ComplaintProcessing = () => {
           content: currentComplaint.request_content,
           category: currentComplaint.category,
           complaintNumber: currentComplaint.complaint_number,
-          department: currentComplaint.department
+          department: currentComplaint.department,
+          summary: currentComplaint.summary
         }
       });
 
