@@ -342,7 +342,7 @@ const ComplaintProcessing = () => {
                     onClick={handleAIRecommendation}
                     disabled={isLoadingAI}
                   >
-                    {isLoadingAI ? "생성 중..." : "상세 보기"}
+                    {isLoadingAI ? "생성 중..." : "AI 답변 생성"}
                   </Button>
                   <Button 
                     variant="default" 
@@ -429,19 +429,19 @@ const ComplaintProcessing = () => {
                     variant="outline" 
                     size="sm" 
                     className="w-full"
-                    onClick={handleAIRecommendation}
-                    disabled={isLoadingAI}
+                    onClick={() => setShowAIRecommendation(true)}
+                    disabled={!aiRecommendation}
                   >
-                    상세 분석 보기
+                    상세 보기
                   </Button>
                   <Button 
                     variant="default" 
                     size="sm" 
                     className="w-full"
-                    onClick={() => setResponseContent(aiRecommendation || responseContent)}
+                    onClick={() => setResponseContent(aiRecommendation || "")}
                     disabled={currentComplaint.status === '1' || !aiRecommendation}
                   >
-                    AI 추천 사용
+                    답변 적용
                   </Button>
                 </div>
               </div>
@@ -480,47 +480,45 @@ const ComplaintProcessing = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bot className="w-5 h-5" />
-              관련 법령 상세 정보
+              AI 답변 추천 - 상세 보기
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg text-accent">주택법 제23조 (청년주택 공급)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm mb-4">
-                  제23조 국가 및 지방자치단체는 청년의 주거안정을 위하여 다음 각 호의 사업을 추진할 수 있다.
-                </p>
-                <ol className="text-sm space-y-2 list-decimal list-inside">
-                  <li>청년을 위한 임대주택의 우선 공급</li>
-                  <li>청년 주거비 지원사업 지원</li>
-                  <li>청년 주택 구입 자금 지원</li>
-                  <li>그 밖에 청년 주거안정을 위해 필요한 사업</li>
-                </ol>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg text-accent">주택공급 시행령 제29조</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm mb-4">
-                  제29조 법 제23조에 따라 청년주택 지원의 기준은 다음과 같다.
-                </p>
-                <ol className="text-sm space-y-2 list-decimal list-inside">
-                  <li>지원 대상: 만 19세 이상 39세 이하</li>
-                  <li>소득 기준: 도시근로자 가구당 월평균 소득 120% 이하</li>
-                  <li>무주택 요건: 신청일 기준 무주택자</li>
-                </ol>
-              </CardContent>
-            </Card>
-
-            <div className="bg-muted/50 p-4 rounded">
-              <p className="text-xs text-muted-foreground">
-                <strong>안내:</strong> 법령 정보는 국가법령정보센터(law.go.kr)에서 제공되며, 최신 개정 내용은 해당 사이트에서 확인하시기 바랍니다.
-              </p>
+            {aiRecommendation ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg text-blue-800">생성된 답변</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="bg-blue-50 p-4 rounded border border-blue-200">
+                    <div className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {aiRecommendation}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">AI 답변이 생성되지 않았습니다.</p>
+              </div>
+            )}
+            
+            <div className="flex justify-end gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAIRecommendation(false)}
+              >
+                닫기
+              </Button>
+              <Button 
+                onClick={() => {
+                  setResponseContent(aiRecommendation || "");
+                  setShowAIRecommendation(false);
+                }}
+                disabled={!aiRecommendation || currentComplaint.status === '1'}
+              >
+                답변 적용
+              </Button>
             </div>
           </div>
         </DialogContent>
