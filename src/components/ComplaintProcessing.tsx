@@ -408,24 +408,23 @@ const ComplaintProcessing = () => {
                     </div>
                   </div>
                 ) : (
-                  <>
-                    <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                      <h4 className="font-medium text-blue-800 mb-2">추천 답변 조치</h4>
-                      <p className="text-blue-700 text-xs">
-                        AI 답변 생성 후 여기에 표시됩니다.
-                      </p>
-                    </div>
-                    
-                    <div className="p-3 bg-green-50 rounded border border-green-200">
-                      <h4 className="font-medium text-green-800 mb-2">참고 법령</h4>
-                      <p className="text-green-700 text-xs">
-                        AI 분석 후 관련 법령이 표시됩니다.
-                      </p>
-                    </div>
-                  </>
+                  <div className="p-3 bg-gray-50 rounded border border-gray-200">
+                    <p className="text-gray-600 text-xs text-center">
+                      "AI 답변 생성" 버튼을 클릭하여 추천 답변을 생성하세요.
+                    </p>
+                  </div>
                 )}
 
                 <div className="space-y-2 mt-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full"
+                    onClick={handleAIRecommendation}
+                    disabled={isLoadingAI}
+                  >
+                    {isLoadingAI ? "생성 중..." : "AI 답변 생성"}
+                  </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
