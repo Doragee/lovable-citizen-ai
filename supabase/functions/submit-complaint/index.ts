@@ -107,8 +107,12 @@ ${departments?.map(dept => `
               aiAnalysis = parsedAnalysis;
             } else {
               console.warn(`AI returned invalid department: ${parsedAnalysis.department}. Using default.`);
+              // Create a proper summary even when department is invalid
+              const words = content.split(' ').slice(0, 15).join(' ');
+              const fallbackSummary = words.length < content.length ? words + ' 관련 문의' : words;
+              
               aiAnalysis = {
-                summary: parsedAnalysis.summary || content.substring(0, 100) + '...',
+                summary: parsedAnalysis.summary || fallbackSummary,
                 department: defaultDepartment
               };
             }
@@ -122,9 +126,15 @@ ${departments?.map(dept => `
         console.error('AI summary generation error:', err);
       }
     }
+    
+    // If AI analysis failed, create a simple fallback summary
     if (!aiAnalysis) {
+      // Create a basic summary by extracting key information
+      const words = content.split(' ').slice(0, 15).join(' ');
+      const fallbackSummary = words.length < content.length ? words + ' 관련 문의' : words;
+      
       aiAnalysis = {
-        summary: content.substring(0, 100) + '...',
+        summary: fallbackSummary,
         department: defaultDepartment
       };
     }
