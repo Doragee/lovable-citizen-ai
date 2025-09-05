@@ -201,7 +201,7 @@ const ComplaintProcessing = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>민원번호</Label>
-                  <Input value={`2024-SJ-${currentComplaint.complaint_number}`} disabled className="bg-muted" />
+                  <Input value={String(currentComplaint.complaint_number)} disabled className="bg-muted" />
                 </div>
                 <div>
                   <Label>접수일</Label>

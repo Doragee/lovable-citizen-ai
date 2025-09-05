@@ -35,7 +35,7 @@ serve(async (req) => {
     const { data: lastComplaint } = await supabase
       .from('civilcomplaint')
       .select('id, complaint_number')
-      .order('complaint_number', { ascending: false })
+      .order('id', { ascending: false })
       .limit(1)
       .single();
 
@@ -149,10 +149,11 @@ ${departments?.map(dept => `
     const summaryEmbedding = summaryEmbeddingData.data[0].embedding;
 
     // Generate next ID and complaint number
-    const nextId = lastComplaint ? lastComplaint.id + 1 : 1;
-    const lastComplaintNum = lastComplaint?.complaint_number || '2024-SJ-0000';
-    const lastNum = parseInt(lastComplaintNum.split('-')[2]) || 0;
-    const nextComplaintNumber = `2024-SJ-${String(lastNum + 1).padStart(4, '0')}`;
+    const lastId = lastComplaint?.id ? Number(lastComplaint.id) : 0;
+    const nextId = lastId + 1;
+    const lastNumRaw = (lastComplaint?.complaint_number ?? 0) as number | string;
+    const lastNumParsed = typeof lastNumRaw === 'number' ? lastNumRaw : Number(lastNumRaw) || 0;
+    const nextComplaintNumber = lastNumParsed + 1;
 
     // Insert into civilcomplaint table
     const { data: insertData, error: insertError } = await supabase
