@@ -68,7 +68,9 @@ const ComplaintProcessing = () => {
         body: {
           title: currentComplaint.title,
           content: currentComplaint.request_content,
-          category: currentComplaint.category
+          category: currentComplaint.category,
+          complaintNumber: currentComplaint.complaint_number,
+          department: currentComplaint.department
         }
       });
 
@@ -397,19 +399,30 @@ const ComplaintProcessing = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3 text-sm">
-                <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                  <h4 className="font-medium text-blue-800 mb-2">추천 답변 조치</h4>
-                  <p className="text-blue-700 text-xs">
-                    청년주택 신청 자격 요건 확인 후 관련 서류 안내가 필요합니다.
-                  </p>
-                </div>
-                
-                <div className="p-3 bg-green-50 rounded border border-green-200">
-                  <h4 className="font-medium text-green-800 mb-2">참고 법령</h4>
-                  <p className="text-green-700 text-xs">
-                    주택법 제23조, 시행령 제29조 관련 내용 참조
-                  </p>
-                </div>
+                {aiRecommendation ? (
+                  <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                    <h4 className="font-medium text-blue-800 mb-2">AI 생성 답변</h4>
+                    <div className="text-blue-700 text-xs whitespace-pre-wrap max-h-32 overflow-y-auto">
+                      {aiRecommendation}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                      <h4 className="font-medium text-blue-800 mb-2">추천 답변 조치</h4>
+                      <p className="text-blue-700 text-xs">
+                        AI 답변 생성 후 여기에 표시됩니다.
+                      </p>
+                    </div>
+                    
+                    <div className="p-3 bg-green-50 rounded border border-green-200">
+                      <h4 className="font-medium text-green-800 mb-2">참고 법령</h4>
+                      <p className="text-green-700 text-xs">
+                        AI 분석 후 관련 법령이 표시됩니다.
+                      </p>
+                    </div>
+                  </>
+                )}
 
                 <div className="space-y-2 mt-4">
                   <Button 
@@ -425,17 +438,8 @@ const ComplaintProcessing = () => {
                     variant="default" 
                     size="sm" 
                     className="w-full"
-                    onClick={() => setResponseContent(
-                      responseContent + 
-                      "안녕하세요. 세종시 청년주택 관련 문의에 대해 안내드립니다.\n\n" +
-                      "청년주택 신청 자격 요건은 다음과 같습니다:\n" +
-                      "1. 만 19세 이상 39세 이하\n" +
-                      "2. 도시근로자 가구당 월평균 소득 120% 이하\n" +
-                      "3. 신청일 기준 무주택자\n\n" +
-                      "자세한 사항은 주택법 제23조 및 시행령 제29조를 참고하시기 바랍니다.\n\n" +
-                      "감사합니다."
-                    )}
-                    disabled={currentComplaint.status === '1'}
+                    onClick={() => setResponseContent(aiRecommendation || responseContent)}
+                    disabled={currentComplaint.status === '1' || !aiRecommendation}
                   >
                     AI 추천 사용
                   </Button>
