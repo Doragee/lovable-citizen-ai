@@ -32,14 +32,23 @@ const ComplaintProcessing = () => {
       const { data, error } = await supabase
         .from('civilcomplaint')
         .select('*')
+        .eq('status', '0')
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No rows found - no pending complaints
+          setCurrentComplaint(null);
+          return;
+        }
+        throw error;
+      }
       setCurrentComplaint(data);
     } catch (error) {
       console.error('Load complaint error:', error);
+      setCurrentComplaint(null);
     }
   };
 
@@ -156,7 +165,11 @@ const ComplaintProcessing = () => {
   if (!currentComplaint) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">처리할 민원을 불러오는 중...</p>
+        <div className="text-center">
+          <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
+          <p className="text-lg font-medium">처리할 민원이 없습니다</p>
+          <p className="text-muted-foreground">모든 민원이 처리 완료되었습니다.</p>
+        </div>
       </div>
     );
   }
