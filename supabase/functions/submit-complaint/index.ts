@@ -107,12 +107,8 @@ ${departments?.map(dept => `
               aiAnalysis = parsedAnalysis;
             } else {
               console.warn(`AI returned invalid department: ${parsedAnalysis.department}. Using default.`);
-              // Create a proper summary even when department is invalid
-              const words = content.split(' ').slice(0, 15).join(' ');
-              const fallbackSummary = words.length < content.length ? words + ' 관련 문의' : words;
-              
               aiAnalysis = {
-                summary: parsedAnalysis.summary || fallbackSummary,
+                summary: parsedAnalysis.summary,
                 department: defaultDepartment
               };
             }
@@ -127,16 +123,9 @@ ${departments?.map(dept => `
       }
     }
     
-    // If AI analysis failed, create a simple fallback summary
+    // AI analysis is required - no fallback allowed
     if (!aiAnalysis) {
-      // Create a basic summary by extracting key information
-      const words = content.split(' ').slice(0, 15).join(' ');
-      const fallbackSummary = words.length < content.length ? words + ' 관련 문의' : words;
-      
-      aiAnalysis = {
-        summary: fallbackSummary,
-        department: defaultDepartment
-      };
+      throw new Error('AI analysis failed. Cannot process complaint without proper summary and department assignment.');
     }
     console.log('AI Analysis completed (with fallback if needed):', aiAnalysis);
 
