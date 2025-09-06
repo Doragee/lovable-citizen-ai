@@ -13,7 +13,7 @@ const CATEGORIES = {
 };
 // OpenAI API 호출 함수 - gpt-4o-mini 전용
 async function callOpenAI(messages, model = "gpt-4o-mini", temperature = 0) {
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
+  const apiKey = Deno.env.get('OPEN_AI_KEY');
   if (!apiKey) {
     throw new Error('OpenAI API key not found');
   }
