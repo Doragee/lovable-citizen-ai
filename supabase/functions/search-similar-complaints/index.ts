@@ -361,8 +361,12 @@ serve(async (req)=>{
     const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '');
     const body = await req.json();
     console.log('받은 요청 body:', JSON.stringify(body, null, 2));
-    const { text, searchType = 'category_first', matchCount = 3, matchThreshold = 0.5 } = body;
-    if (!text?.trim()) {
+    const { text, title, content, searchType = 'category_first', matchCount = 3, matchThreshold = 0.5 } = body;
+    
+    // text가 없으면 content나 title을 사용
+    const searchText = text || content || title;
+    
+    if (!searchText?.trim()) {
       console.log('텍스트 없음');
       return new Response(JSON.stringify({
         error: '검색할 텍스트를 입력해주세요.'
@@ -374,10 +378,11 @@ serve(async (req)=>{
         }
       });
     }
-    console.log('검색 텍스트:', text);
+    
+    console.log('검색 텍스트:', searchText);
     console.log('임베딩 생성 시도...');
-    // 향상된 검색 수행
-    const result = await enhancedComplaintSearch(supabaseClient, text, searchType, matchCount, matchThreshold);
+    // 향상된 검색 수행 - text 대신 searchText 사용
+    const result = await enhancedComplaintSearch(supabaseClient, searchText, searchType, matchCount, matchThreshold);
     return new Response(JSON.stringify(result), {
       headers: {
         ...corsHeaders,
