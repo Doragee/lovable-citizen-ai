@@ -13,7 +13,7 @@ const CATEGORIES = {
 };
 // OpenAI API 호출 함수 - gpt-4o-mini 전용
 async function callOpenAI(messages, model = "gpt-4o-mini", temperature = 0) {
-  const rawApiKey = Deno.env.get('OPEN_AI_KEY');
+  const rawApiKey = Deno.env.get('chatgpt') ?? Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('OPEN_AI_KEY');
   
   // API 키 유효성 검사
   if (!rawApiKey || typeof rawApiKey !== 'string') {
@@ -66,7 +66,7 @@ async function callOpenAI(messages, model = "gpt-4o-mini", temperature = 0) {
 }
 // 임베딩 생성 함수
 async function getEmbedding(text) {
-  const rawApiKey = Deno.env.get('OPEN_AI_KEY');
+  const rawApiKey = Deno.env.get('chatgpt') ?? Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('OPEN_AI_KEY');
   
   // API 키 유효성 검사
   if (!rawApiKey || typeof rawApiKey !== 'string') {
@@ -386,10 +386,13 @@ serve(async (req)=>{
     });
   }
   try {
+    const apiKey = Deno.env.get('chatgpt') ?? Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('OPEN_AI_KEY');
     console.log('환경 변수 확인:', {
-      hasOpenAI: !!Deno.env.get('OPEN_AI_KEY'),
-      openAIKeyLength: Deno.env.get('OPEN_AI_KEY')?.length || 0,
-      openAIKeyValid: Deno.env.get('OPEN_AI_KEY')?.trim().startsWith('sk-') || false,
+      hasChatGPT: !!Deno.env.get('chatgpt'),
+      hasOpenAI: !!Deno.env.get('OPENAI_API_KEY'),
+      hasOpenAILegacy: !!Deno.env.get('OPEN_AI_KEY'),
+      apiKeyLength: apiKey?.length || 0,
+      apiKeyValid: apiKey?.trim().startsWith('sk-') || false,
       hasSupabase: !!Deno.env.get('SUPABASE_URL'),
       hasSupabaseAnon: !!Deno.env.get('SUPABASE_ANON_KEY')
     });
