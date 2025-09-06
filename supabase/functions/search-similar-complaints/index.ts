@@ -11,31 +11,41 @@ const CATEGORIES = {
   "재해∙보상": "공무원 재해보상, 안전정책, 공무상 재해, 산업재해, 사고, 재해",
   "채용∙임용": "국가공무원 채용시험, 임용제도, 시험문제, 채용제도, 국가직 시험, 공채, 경채, 면접, 필기시험"
 };
-// OpenAI API 호출 함수
+// OpenAI API 호출 함수 - gpt-4o-mini 전용
 async function callOpenAI(messages, model = "gpt-4o-mini", temperature = 0) {
   const apiKey = Deno.env.get('OPENAI_API_KEY');
   if (!apiKey) {
     throw new Error('OpenAI API key not found');
   }
+  const requestBody = {
+    model,
+    messages,
+    temperature
+  };
+  // gpt-4o-mini는 JSON mode를 지원하므로 항상 추가
+  requestBody.response_format = {
+    type: "json_object"
+  };
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature,
-      response_format: {
-        "type": "json_object"
-      }
-    })
+    body: JSON.stringify(requestBody)
   });
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error('OpenAI API error details:', errorText);
     throw new Error(`OpenAI API error: ${response.statusText}`);
   }
-  return await response.json();
+  const data = await response.json();
+  // 응답 검증
+  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    console.error('Invalid OpenAI response structure:', data);
+    throw new Error('Invalid response from OpenAI API');
+  }
+  return data;
 }
 // 임베딩 생성 함수
 async function getEmbedding(text) {
@@ -60,18 +70,28 @@ async function getEmbedding(text) {
   const data = await response.json();
   return data.data[0].embedding;
 }
-// 카테고리 분류 함수
+// 카테고리 분류 함수 
 async function classifyCategory(text) {
+  const validCategories = [
+    "성과∙급여",
+    "윤리∙복무",
+    "재해∙보상",
+    "채용∙임용"
+  ];
+  // 더 명확한 시스템 프롬프트
   const systemPrompt = `당신은 민원 카테고리 분류 전문가입니다.
-사용자의 질문을 다음 4개 카테고리 중 하나로 정확히 분류해주세요:
+다음 질문을 정확히 4개 카테고리 중 하나로 분류하고, 반드시 아래 JSON 형식으로만 응답하세요.
 
-1. 성과∙급여: 성과평가, 급여관리, 승진심사, 교육훈련, 출장비, 수당, 보수 관련
-2. 윤리∙복무: 징계, 복무, 공직윤리, 근무시간, 휴가, 병가, 청렴, 이해충돌 관련
-3. 재해∙보상: 공무원 재해보상, 안전정책, 공무상 재해, 산업재해, 사고, 재해 관련
-4. 채용∙임용: 국가공무원 채용시험, 임용제도, 시험문제, 채용제도, 국가직 시험, 공채, 경채, 면접, 필기시험 관련
+카테고리:
+1. 성과∙급여: 성과평가, 급여관리, 승진심사, 출장비, 수당, 보수, 연봉, 성과금
+2. 윤리∙복무: 징계, 복무, 공직윤리, 근무시간, 휴가, 병가, 청렴, 이해충돌  
+3. 재해∙보상: 공무원 재해보상, 안전정책, 공무상 재해, 산업재해, 사고, 재해
+4. 채용∙임용: 국가공무원 채용시험, 임용제도, 시험문제, 채용제도, 국가직 시험, 공채, 경채, 면접, 필기시험
 
-반드시 다음 JSON 형식으로만 응답하세요:
-{"category": "카테고리명", "confidence": 0.95}`;
+응답 형식 (이 형식을 정확히 지켜주세요):
+{"category": "카테고리명", "confidence": 0.95}
+
+중요: category는 반드시 위 4개 중 하나여야 하고, confidence는 0~1 사이 숫자입니다.`;
   try {
     const response = await callOpenAI([
       {
@@ -80,16 +100,47 @@ async function classifyCategory(text) {
       },
       {
         role: "user",
-        content: `다음 질문을 분류해주세요: ${text}`
+        content: `다음 민원을 분류해주세요: "${text}"`
       }
     ]);
-    const result = JSON.parse(response.choices[0].message.content);
+    // 응답 검증
+    if (!response.choices || !response.choices[0] || !response.choices[0].message) {
+      throw new Error('OpenAI 응답 구조가 올바르지 않습니다');
+    }
+    const content = response.choices[0].message.content.trim();
+    console.log('OpenAI 원본 응답:', content);
+    // JSON 파싱
+    let result;
+    try {
+      result = JSON.parse(content);
+    } catch (parseError) {
+      console.error('JSON 파싱 실패:', parseError);
+      console.error('파싱 시도한 내용:', content);
+      // 간단한 fallback: 기본값 반환
+      return {
+        category: "",
+        confidence: 0
+      };
+    }
+    // 카테고리 검증
+    if (!result.category || !validCategories.includes(result.category)) {
+      console.warn('유효하지 않은 카테고리:', result.category);
+      return {
+        category: "",
+        confidence: 0
+      };
+    }
+    // confidence 검증 및 보정
+    const confidence = typeof result.confidence === 'number' ? result.confidence : 0;
+    const validConfidence = Math.max(0, Math.min(1, confidence));
+    console.log(`분류 결과: ${result.category} (신뢰도: ${validConfidence})`);
     return {
-      category: result.category || "",
-      confidence: result.confidence || 0
+      category: result.category,
+      confidence: validConfidence
     };
   } catch (error) {
-    console.error('카테고리 분류 오류:', error);
+    console.error('카테고리 분류 중 오류:', error);
+    console.error('Error details:', error.message);
     return {
       category: "",
       confidence: 0
@@ -227,8 +278,7 @@ function reciprocalRankFusion(results, topK, rrfK = 60) {
   // 추가 메트릭 계산 및 정렬
   const sortedDocs = Object.entries(rrfScores).map(([docId, scores])=>{
     const sourceCount = Object.keys(scores.source_scores).length;
-    const diversityWeight = 1 + (sourceCount - 1) * 0.1 // 각 추가 소스당 10% 보너스
-    ;
+    const diversityWeight = 1 + (sourceCount - 1) * 0.1; // 각 추가 소스당 10% 보너스
     const finalRrfScore = scores.total_score * diversityWeight;
     return {
       docId,
@@ -292,7 +342,9 @@ async function enhancedComplaintSearch(supabaseClient, text, searchType = 'categ
     totalFound: rawResults.length
   };
 }
+// 메인 서버 핸들러
 serve(async (req)=>{
+  console.log('=== Edge Function 시작 ===');
   // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
@@ -300,11 +352,18 @@ serve(async (req)=>{
     });
   }
   try {
+    console.log('환경 변수 확인:', {
+      hasOpenAI: !!Deno.env.get('OPENAI_API_KEY'),
+      hasSupabase: !!Deno.env.get('SUPABASE_URL')
+    });
     // Supabase 클라이언트 초기화
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
     const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '');
-    const { text, searchType = 'category_first', matchCount = 3, matchThreshold = 0.5 } = await req.json();
+    const body = await req.json();
+    console.log('받은 요청 body:', JSON.stringify(body, null, 2));
+    const { text, searchType = 'category_first', matchCount = 3, matchThreshold = 0.5 } = body;
     if (!text?.trim()) {
+      console.log('텍스트 없음');
       return new Response(JSON.stringify({
         error: '검색할 텍스트를 입력해주세요.'
       }), {
@@ -315,6 +374,8 @@ serve(async (req)=>{
         }
       });
     }
+    console.log('검색 텍스트:', text);
+    console.log('임베딩 생성 시도...');
     // 향상된 검색 수행
     const result = await enhancedComplaintSearch(supabaseClient, text, searchType, matchCount, matchThreshold);
     return new Response(JSON.stringify(result), {
@@ -325,6 +386,7 @@ serve(async (req)=>{
     });
   } catch (error) {
     console.error('검색 중 오류 발생:', error);
+    console.error('Error stack:', error.stack);
     return new Response(JSON.stringify({
       error: '검색 중 오류가 발생했습니다.',
       details: error.message
