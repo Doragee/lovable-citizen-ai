@@ -49,7 +49,7 @@ async function callOpenAI(messages, model = "gpt-4o-mini", temperature = 0) {
 }
 // 임베딩 생성 함수
 async function getEmbedding(text) {
-  const apiKey = Deno.env.get('OPEN_AI_KEY');
+  const apiKey = Deno.env.get('OPENAI_API_KEY');
   if (!apiKey) {
     throw new Error('OpenAI API key not found');
   }
