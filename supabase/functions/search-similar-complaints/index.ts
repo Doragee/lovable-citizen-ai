@@ -13,9 +13,26 @@ const CATEGORIES = {
 };
 // OpenAI API 호출 함수 - gpt-4o-mini 전용
 async function callOpenAI(messages, model = "gpt-4o-mini", temperature = 0) {
-  const apiKey = Deno.env.get('OPEN_AI_KEY');
-  if (!apiKey) {
-    throw new Error('OpenAI API key not found');
+  const rawApiKey = Deno.env.get('OPEN_AI_KEY');
+  
+  // API 키 유효성 검사
+  if (!rawApiKey || typeof rawApiKey !== 'string') {
+    console.error('OPEN_AI_KEY 환경 변수가 설정되지 않았거나 유효하지 않습니다.');
+    throw new Error('OpenAI API key not found or invalid');
+  }
+  
+  // API 키 정리 (공백, 개행 문자 제거)
+  const apiKey = rawApiKey.trim();
+  
+  if (apiKey.length === 0) {
+    console.error('OPEN_AI_KEY가 빈 문자열입니다.');
+    throw new Error('OpenAI API key is empty');
+  }
+  
+  // API 키 형식 기본 검증 (sk-로 시작하는지)
+  if (!apiKey.startsWith('sk-')) {
+    console.error('OPEN_AI_KEY 형식이 올바르지 않습니다.');
+    throw new Error('OpenAI API key format is invalid');
   }
   const requestBody = {
     model,
@@ -49,9 +66,26 @@ async function callOpenAI(messages, model = "gpt-4o-mini", temperature = 0) {
 }
 // 임베딩 생성 함수
 async function getEmbedding(text) {
-  const apiKey = Deno.env.get('OPEN_AI_KEY');
-  if (!apiKey) {
-    throw new Error('OpenAI API key not found');
+  const rawApiKey = Deno.env.get('OPEN_AI_KEY');
+  
+  // API 키 유효성 검사
+  if (!rawApiKey || typeof rawApiKey !== 'string') {
+    console.error('OPEN_AI_KEY 환경 변수가 설정되지 않았거나 유효하지 않습니다.');
+    throw new Error('OpenAI API key not found or invalid');
+  }
+  
+  // API 키 정리 (공백, 개행 문자 제거)
+  const apiKey = rawApiKey.trim();
+  
+  if (apiKey.length === 0) {
+    console.error('OPEN_AI_KEY가 빈 문자열입니다.');
+    throw new Error('OpenAI API key is empty');
+  }
+  
+  // API 키 형식 기본 검증 (sk-로 시작하는지)
+  if (!apiKey.startsWith('sk-')) {
+    console.error('OPEN_AI_KEY 형식이 올바르지 않습니다.');
+    throw new Error('OpenAI API key format is invalid');
   }
   const response = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
@@ -354,7 +388,10 @@ serve(async (req)=>{
   try {
     console.log('환경 변수 확인:', {
       hasOpenAI: !!Deno.env.get('OPEN_AI_KEY'),
-      hasSupabase: !!Deno.env.get('SUPABASE_URL')
+      openAIKeyLength: Deno.env.get('OPEN_AI_KEY')?.length || 0,
+      openAIKeyValid: Deno.env.get('OPEN_AI_KEY')?.trim().startsWith('sk-') || false,
+      hasSupabase: !!Deno.env.get('SUPABASE_URL'),
+      hasSupabaseAnon: !!Deno.env.get('SUPABASE_ANON_KEY')
     });
     // Supabase 클라이언트 초기화
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
